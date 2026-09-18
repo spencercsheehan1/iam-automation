@@ -1,0 +1,4 @@
+employee_id,name,email,department,employment_status,snowflake_username
+E001,Alice,alice@example.com,Data,active,ALICE
+E002,Bob,bob@example.com,Marketing,active,BOB
+E003,Charlie,charlie@example.com,Data,terminated,CHARLIE
