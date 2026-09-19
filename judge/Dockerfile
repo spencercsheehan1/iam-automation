@@ -13,8 +13,12 @@ COPY app.py db.py db_sqlite.py db_dynamo.py evaluator.py employee_data.py snowfl
 COPY policies/ ./policies/
 COPY data/ ./data/
 
-# Non-root user — no reason for this process to run as root.
-RUN useradd --create-home --shell /usr/sbin/nologin appuser
+# Non-root user — no reason for this process to run as root. chown /app
+# so JUDGE_DB_BACKEND=sqlite (local/dev use of this image) can write
+# judge.db here; production always runs JUDGE_DB_BACKEND=dynamodb, which
+# needs no local write access at all.
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8501
