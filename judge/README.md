@@ -10,6 +10,51 @@ See [`../judge-prd.md`](../judge-prd.md) for the full product spec.
 ALB, DynamoDB, real Snowflake trial account — see
 [`infra/README.md`](infra/README.md) for the deployed architecture).
 
+## Call flow
+
+What happens when someone clicks **Run Evaluation**:
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant UI as app.py (Streamlit)
+    participant Eval as evaluator.py (Judge)
+    participant SF as snowflake_client.py
+    participant Snowflake
+    participant Emp as employee_data.py
+    participant DB as db.py
+    participant Store as SQLite / DynamoDB
+
+    User->>UI: Click "Run Evaluation"
+    UI->>Eval: evaluate_all(policy)
+    Eval->>SF: get_role_assignments(role)
+    SF->>Snowflake: SHOW GRANTS OF ROLE ...
+    Snowflake-->>SF: role assignments
+    SF-->>Eval: assignments
+
+    loop for each user holding the role
+        Eval->>Emp: get_employee_by_snowflake_username(user)
+        Emp-->>Eval: department, employment_status
+        Eval->>Eval: compare vs. policy (the Jury)
+        Note right of Eval: PASS / FAIL / ERROR
+    end
+
+    Eval-->>UI: EvaluationResult[]
+    UI->>DB: save_results(results)
+    DB->>Store: append-only write
+    UI->>DB: load_latest_run() / load_all_results()
+    DB->>Store: read
+    Store-->>DB: rows
+    DB-->>UI: rows
+    UI-->>User: dashboard, metrics, Bailiff recommendations
+```
+
+If `snowflake_client.py` or `employee_data.py` can't get an answer (a
+down data source, a missing employee record), that becomes `ERROR`
+instead of a silent `PASS` — see the decision table below. `db.py`
+picks SQLite or DynamoDB per `JUDGE_DB_BACKEND`, transparently to
+everything above it.
+
 ## How it works
 
 - **Jury** — the eligibility policy (`policies/prod_analytics_role.yaml`).
