@@ -3,3 +3,7 @@ E001,Alice,alice@example.com,Data,active,ALICE
 E002,Bob,bob@example.com,Marketing,active,BOB
 E003,Charlie,charlie@example.com,Data,terminated,CHARLIE
 E004,Winston,winston@example.com,LEADERSHIP,active,WINSTON
+E005,Yev,yev@example.com,TPM,active,YEV
+E006,Joshua,joshua@example.com,TRUST,active,JOSHUA
+E007,Angela,angela@example.com,ACCOUNTING,active,ANGELA
+E008,Spencer,spencer@example.com,GRC,active,SPENCER
