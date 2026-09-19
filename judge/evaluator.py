@@ -18,7 +18,8 @@ import yaml
 from employee_data import Employee, EmployeeDataError, get_employee_by_snowflake_username
 from snowflake_client import SnowflakeQueryError, get_role_assignments
 
-DEFAULT_POLICY_PATH = Path(__file__).parent / "policies" / "prod_analytics_role.yaml"
+POLICIES_DIR = Path(__file__).parent / "policies"
+DEFAULT_POLICY_PATH = POLICIES_DIR / "prod_analytics_role.yaml"
 
 DECISION_PASS = "PASS"
 DECISION_FAIL = "FAIL"
@@ -29,7 +30,9 @@ DECISION_ERROR = "ERROR"
 class Policy:
     role: str
     version: str
-    eligibility: dict[str, str]
+    # Each value is a single expected string, or a list of strings meaning
+    # "any of these" (e.g. department: [TRUST, GRC]).
+    eligibility: dict[str, str | list[str]]
 
 
 class PolicyError(Exception):
@@ -53,6 +56,18 @@ def load_policy(path: Path = DEFAULT_POLICY_PATH) -> Policy:
         version=str(raw.get("version", "unknown")),
         eligibility=dict(raw["eligibility"]),
     )
+
+
+def load_policies(directory: Path = POLICIES_DIR) -> list[Policy]:
+    """Load every ``*.yaml`` policy in ``directory``, sorted by filename.
+
+    Raises PolicyError if any file is malformed or the directory holds no
+    policies — an empty set must never look like "nothing to check".
+    """
+    paths = sorted(directory.glob("*.yaml"))
+    if not paths:
+        raise PolicyError(f"No policy files found in: {directory}")
+    return [load_policy(p) for p in paths]
 
 
 @dataclass(frozen=True)
@@ -80,16 +95,28 @@ def evaluate_employee(employee: Employee, policy: Policy) -> tuple[str, str]:
     attrs = {
         "employment_status": employee.employment_status,
         "department": employee.department,
+        "email": employee.email,
     }
 
     for field_name, expected in policy.eligibility.items():
         actual = attrs.get(field_name)
-        if actual is None or actual.strip().lower() != str(expected).strip().lower():
-            mismatches.append(f"{field_name}_expected={expected}, {field_name}_actual={actual}")
+        allowed = expected if isinstance(expected, list) else [expected]
+        allowed_norm = {str(a).strip().lower() for a in allowed}
+        if actual is None or actual.strip().lower() not in allowed_norm:
+            shown = "|".join(str(a) for a in allowed)
+            mismatches.append(f"{field_name}_expected={shown}, {field_name}_actual={actual}")
 
     if mismatches:
         return DECISION_FAIL, "; ".join(mismatches)
     return DECISION_PASS, "User satisfies all eligibility requirements."
+
+
+def evaluate_policies(policies: list[Policy]) -> list[EvaluationResult]:
+    """Evaluate every policy and concatenate the results, in policy order."""
+    results: list[EvaluationResult] = []
+    for policy in policies:
+        results.extend(evaluate_all(policy))
+    return results
 
 
 def evaluate_all(policy: Policy | None = None) -> list[EvaluationResult]:
@@ -159,6 +186,7 @@ def evaluate_all(policy: Policy | None = None) -> list[EvaluationResult]:
                 employee_attributes_used={
                     "employee_id": employee.employee_id,
                     "name": employee.name,
+                    "email": employee.email,
                     "department": employee.department,
                     "employment_status": employee.employment_status,
                 },

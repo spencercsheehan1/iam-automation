@@ -57,7 +57,10 @@ everything above it.
 
 ## How it works
 
-- **Jury** — the eligibility policy (`policies/prod_analytics_role.yaml`).
+- **Jury** — the eligibility policies, one YAML file per role in `policies/`.
+  A condition's value may be a list, meaning "any of" (e.g.
+  `department: [TRUST, GRC]`); supported attributes are `employment_status`,
+  `department`, and `email`. Unknown attributes fail closed.
 - **Judge** — the deterministic evaluation engine (`evaluator.py`) that
   compares each user's actual attributes and Snowflake access against
   the Jury's policy.
