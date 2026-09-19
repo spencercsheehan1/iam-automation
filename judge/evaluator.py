@@ -112,14 +112,19 @@ def evaluate_employee(employee: Employee, policy: Policy) -> tuple[str, str]:
 
 
 def evaluate_policies(policies: list[Policy]) -> list[EvaluationResult]:
-    """Evaluate every policy and concatenate the results, in policy order."""
+    """Evaluate every policy and concatenate the results, in policy order.
+
+    All results share one ``evaluated_at`` — the dashboard treats rows with
+    the same timestamp as a single run ("Latest Evaluation").
+    """
+    now = _now_iso()
     results: list[EvaluationResult] = []
     for policy in policies:
-        results.extend(evaluate_all(policy))
+        results.extend(evaluate_all(policy, evaluated_at=now))
     return results
 
 
-def evaluate_all(policy: Policy | None = None) -> list[EvaluationResult]:
+def evaluate_all(policy: Policy | None = None, evaluated_at: str | None = None) -> list[EvaluationResult]:
     """Evaluate every user currently holding the policy's role.
 
     Distinguishes PASS/FAIL (a real decision) from ERROR (Judge could not
@@ -128,7 +133,7 @@ def evaluate_all(policy: Policy | None = None) -> list[EvaluationResult]:
     """
     policy = policy or load_policy()
     results: list[EvaluationResult] = []
-    now = _now_iso()
+    now = evaluated_at or _now_iso()
 
     try:
         assignments = get_role_assignments(policy.role)

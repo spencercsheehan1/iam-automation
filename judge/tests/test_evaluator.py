@@ -216,3 +216,17 @@ def test_evaluate_policies_end_to_end_sample_data(monkeypatch):
     assert by_key[("SPENCER", "PROD_AUDITOR_RO_ROLE")] == DECISION_PASS
     assert by_key[("SPENCER", "PROD_ADMIN_ROLE")] == DECISION_PASS
     assert by_key[("WINSTON", "PROD_ADMIN_ROLE")] == DECISION_FAIL
+
+
+def test_evaluate_policies_uses_one_timestamp_per_run(monkeypatch):
+    import evaluator
+    from evaluator import evaluate_policies, load_policies
+
+    monkeypatch.setenv("JUDGE_MODE", "sample")
+    stamps = iter(f"2026-01-01T00:00:{i:02d}+00:00" for i in range(60))
+    monkeypatch.setattr(evaluator, "_now_iso", lambda: next(stamps))
+
+    results = evaluate_policies(load_policies())
+
+    assert len(results) > 1
+    assert len({r.evaluated_at for r in results}) == 1
