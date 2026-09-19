@@ -1,6 +1,6 @@
 # Audit-trail table. Single logical partition (pk="EVAL") since evaluation
 # volume for this MVP is tiny (a handful of users, run on-demand or daily) —
-# see db_dynamo.py for the access-pattern rationale.
+# see storage/dynamodb.py for the access-pattern rationale.
 resource "aws_dynamodb_table" "evaluations" {
   name         = "${var.app_name}-evaluations"
   billing_mode = "PAY_PER_REQUEST" # no capacity planning for near-zero traffic

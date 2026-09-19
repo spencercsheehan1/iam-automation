@@ -15,10 +15,10 @@ from typing import Any
 
 import yaml
 
-from employee_data import Employee, EmployeeDataError, get_employee_by_snowflake_username
-from snowflake_client import SnowflakeQueryError, get_role_assignments
+from sources.employee_data import Employee, EmployeeDataError, get_employee_by_snowflake_username
+from sources.snowflake_client import SnowflakeQueryError, get_role_assignments
 
-POLICIES_DIR = Path(__file__).parent / "policies"
+POLICIES_DIR = Path(__file__).resolve().parent.parent / "policies"
 DEFAULT_POLICY_PATH = POLICIES_DIR / "prod_analytics_role.yaml"
 
 DECISION_PASS = "PASS"

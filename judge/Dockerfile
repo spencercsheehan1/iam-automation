@@ -9,7 +9,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py db.py db_dynamo.py evaluator.py employee_data.py snowflake_client.py ./
+COPY app.py ./
+COPY engine/ ./engine/
+COPY sources/ ./sources/
+COPY storage/ ./storage/
 COPY policies/ ./policies/
 COPY data/ ./data/
 
