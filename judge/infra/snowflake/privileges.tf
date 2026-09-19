@@ -27,10 +27,12 @@ locals {
       account_privileges = []
     }
     # Administers identities; deliberately NOT granted MANAGE GRANTS or any data access.
+    # (MONITOR USAGE is not listed: only ACCOUNTADMIN can grant it, and
+    # SECURITYADMIN — which Terraform runs as — cannot.)
     PROD_ADMIN_ROLE = {
       read_schemas       = []
       write_schemas      = []
-      account_privileges = ["CREATE USER", "CREATE ROLE", "MONITOR USAGE"]
+      account_privileges = ["CREATE USER", "CREATE ROLE"]
     }
   }
 
