@@ -10,9 +10,18 @@ See [`../judge-prd.md`](../judge-prd.md) for the full product spec.
 ALB, DynamoDB, real Snowflake trial account — see
 [`infra/README.md`](infra/README.md) for the deployed architecture).
 
+## How it works at a glance
+
+![Process flow: start a check, ask Snowflake who holds the role, look up each person, compare to policy, then PASS, FAIL or ERROR, save the results and show the dashboard](docs/judge-process-flow.png)
+
+Each time someone clicks **Run Evaluation**, Judge finds everyone who holds
+a sensitive access role, checks each person against the written policy, and
+records a PASS, FAIL or ERROR for each. Nothing is ever revoked automatically;
+people review what Judge flags.
+
 ## Call flow
 
-What happens when someone clicks **Run Evaluation**:
+The same process, in technical detail:
 
 ```mermaid
 sequenceDiagram
