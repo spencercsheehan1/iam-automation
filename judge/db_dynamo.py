@@ -1,10 +1,8 @@
 """DynamoDB persistence for evaluation results (the audit trail).
 
-Production backend (JUDGE_DB_BACKEND=dynamodb) — a container's local disk
-doesn't survive restarts/redeploys and isn't shared across instances, so
-production uses a managed table instead of the SQLite file used locally.
-See db_sqlite.py for the local-dev backend and db.py for backend
-selection.
+The audit-trail backend — a container's local disk doesn't survive
+restarts/redeploys and isn't shared across instances, so results live in a
+managed table. db.py re-exports these functions for app.py.
 
 Table layout (single logical partition — evaluation volume here is tiny,
 so a GSI/sharding scheme would be over-engineering for this MVP):

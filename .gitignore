@@ -8,7 +8,6 @@ __pycache__/
 venv/
 
 # Local runtime data / secrets
-judge/judge.db
 judge/.snowflake/
 .env
 *.env
