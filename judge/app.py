@@ -41,18 +41,33 @@ except PolicyError as exc:
     st.error(f"Could not load policy: {exc}")
     st.stop()
 
-if st.button("▶ Run Evaluation", type="primary"):
+if "show_results" not in st.session_state:
+    # Hidden by default, even if past runs are sitting in the audit
+    # trail — a fresh page load should look like the tool hasn't run
+    # yet, so an audience can tell "just started" apart from "just ran".
+    st.session_state.show_results = False
+
+run_col, clear_col = st.columns([1, 1])
+with run_col:
+    run_clicked = st.button("▶ Run Evaluation", type="primary")
+with clear_col:
+    clear_clicked = st.button("🗑️ Clear")
+
+if run_clicked:
     with st.spinner("Judge is evaluating..."):
         results = evaluate_all(policy)
         db.save_results(results)
+    st.session_state.show_results = True
     st.success(f"Evaluation complete — {len(results)} user(s) evaluated.")
 
-latest = db.load_latest_run()
+if clear_clicked:
+    st.session_state.show_results = False
 
 st.header("Latest Evaluation")
-if not latest:
-    st.info("No evaluations yet. Click **Run Evaluation** to get started.")
+if not st.session_state.show_results:
+    st.info("No evaluation shown. Click **Run Evaluation** to get started.")
 else:
+    latest = db.load_latest_run()
     df = pd.DataFrame(latest)[["user", "role", "decision", "reason", "evaluated_at"]]
     df.columns = ["User", "Snowflake Role", "Decision", "Reason", "Evaluated"]
 
