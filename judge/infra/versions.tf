@@ -28,3 +28,12 @@ provider "aws" {
     }
   }
 }
+
+# The domain (spencer-sheehan.com) lives in a separate AWS account from
+# the app — this alias manages the DNS records (cert validation + the
+# judge.spencer-sheehan.com record itself) in that account instead.
+provider "aws" {
+  alias   = "dns"
+  region  = var.aws_region
+  profile = "general"
+}

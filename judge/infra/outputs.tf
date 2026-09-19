@@ -1,11 +1,19 @@
 output "service_url" {
   description = "Public HTTPS URL for the Judge dashboard."
-  value       = "https://${aws_apprunner_service.judge.service_url}"
+  value       = "https://${var.domain_name}"
 }
 
-output "service_arn" {
-  description = "App Runner service ARN, for manual `aws apprunner start-deployment` calls."
-  value       = aws_apprunner_service.judge.arn
+output "alb_dns_name" {
+  description = "Raw ALB DNS name (redirects to service_url over HTTPS)."
+  value       = aws_lb.judge.dns_name
+}
+
+output "ecs_cluster_name" {
+  value = aws_ecs_cluster.judge.name
+}
+
+output "ecs_service_name" {
+  value = aws_ecs_service.judge.name
 }
 
 output "ecr_repository_url" {

@@ -1,41 +1,46 @@
-# --- Access role: lets the App Runner control plane pull the image from ECR ---
-data "aws_iam_policy_document" "apprunner_assume_ecr" {
+# --- Execution role: what the ECS agent itself needs (pull image, write
+# logs, resolve the Secrets Manager value before container start) ---
+data "aws_iam_policy_document" "ecs_assume" {
   statement {
     actions = ["sts:AssumeRole"]
     principals {
       type        = "Service"
-      identifiers = ["build.apprunner.amazonaws.com"]
+      identifiers = ["ecs-tasks.amazonaws.com"]
     }
   }
 }
 
-resource "aws_iam_role" "apprunner_ecr_access" {
-  name               = "${var.app_name}-apprunner-ecr-access"
-  assume_role_policy = data.aws_iam_policy_document.apprunner_assume_ecr.json
+resource "aws_iam_role" "ecs_execution" {
+  name               = "${var.app_name}-ecs-execution"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
 }
 
-resource "aws_iam_role_policy_attachment" "apprunner_ecr_access" {
-  role       = aws_iam_role.apprunner_ecr_access.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
+resource "aws_iam_role_policy_attachment" "ecs_execution_managed" {
+  role       = aws_iam_role.ecs_execution.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# --- Instance role: what the running container is allowed to call ---
-data "aws_iam_policy_document" "apprunner_assume_instance" {
+data "aws_iam_policy_document" "ecs_execution_secrets" {
   statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["tasks.apprunner.amazonaws.com"]
-    }
+    sid       = "ReadSnowflakePrivateKeyForTaskStartup"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = [aws_secretsmanager_secret.snowflake_private_key.arn]
   }
 }
 
-resource "aws_iam_role" "apprunner_instance" {
-  name               = "${var.app_name}-apprunner-instance"
-  assume_role_policy = data.aws_iam_policy_document.apprunner_assume_instance.json
+resource "aws_iam_role_policy" "ecs_execution_secrets" {
+  name   = "${var.app_name}-ecs-execution-secrets"
+  role   = aws_iam_role.ecs_execution.id
+  policy = data.aws_iam_policy_document.ecs_execution_secrets.json
 }
 
-data "aws_iam_policy_document" "apprunner_instance_permissions" {
+# --- Task role: what the running container itself is allowed to call ---
+resource "aws_iam_role" "ecs_task" {
+  name               = "${var.app_name}-ecs-task"
+  assume_role_policy = data.aws_iam_policy_document.ecs_assume.json
+}
+
+data "aws_iam_policy_document" "ecs_task_permissions" {
   statement {
     sid = "DynamoDBAuditTrail"
     actions = [
@@ -46,16 +51,10 @@ data "aws_iam_policy_document" "apprunner_instance_permissions" {
     ]
     resources = [aws_dynamodb_table.evaluations.arn]
   }
-
-  statement {
-    sid       = "ReadSnowflakePrivateKey"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.snowflake_private_key.arn]
-  }
 }
 
-resource "aws_iam_role_policy" "apprunner_instance_permissions" {
-  name   = "${var.app_name}-apprunner-instance-permissions"
-  role   = aws_iam_role.apprunner_instance.id
-  policy = data.aws_iam_policy_document.apprunner_instance_permissions.json
+resource "aws_iam_role_policy" "ecs_task_permissions" {
+  name   = "${var.app_name}-ecs-task-permissions"
+  role   = aws_iam_role.ecs_task.id
+  policy = data.aws_iam_policy_document.ecs_task_permissions.json
 }

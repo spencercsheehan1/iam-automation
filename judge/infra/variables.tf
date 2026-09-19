@@ -16,16 +16,16 @@ variable "image_tag" {
   default     = "latest"
 }
 
-variable "apprunner_cpu" {
-  description = "App Runner vCPU allocation (e.g. \"0.25 vCPU\")."
+variable "fargate_cpu" {
+  description = "Fargate task CPU units (256 = 0.25 vCPU). Must be a valid Fargate cpu/memory pairing."
   type        = string
-  default     = "0.25 vCPU"
+  default     = "256"
 }
 
-variable "apprunner_memory" {
-  description = "App Runner memory allocation (e.g. \"0.5 GB\")."
+variable "fargate_memory" {
+  description = "Fargate task memory in MB (512 = 0.5 GB). Must be a valid Fargate cpu/memory pairing."
   type        = string
-  default     = "0.5 GB"
+  default     = "512"
 }
 
 variable "snowflake_account" {
@@ -48,4 +48,16 @@ variable "snowflake_role" {
   description = "Snowflake role Judge assumes when connecting (needs visibility into role grants)."
   type        = string
   default     = "SECURITYADMIN"
+}
+
+variable "domain_name" {
+  description = "Full hostname the app is served at, e.g. judge.spencer-sheehan.com."
+  type        = string
+  default     = "judge.spencer-sheehan.com"
+}
+
+variable "route53_zone_id" {
+  description = "Hosted zone ID for the parent domain, in the account that owns the domain (not harvey-admin)."
+  type        = string
+  default     = "Z0984600KXJ4CXHKZJO5" # spencer-sheehan.com, account 844670296817 (profile "general")
 }
