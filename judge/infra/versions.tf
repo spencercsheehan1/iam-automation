@@ -14,6 +14,9 @@ terraform {
   # config ever passes a real secret through a Terraform resource (see
   # secrets.tf), so the state file never contains sensitive material
   # even though it lives on local disk.
+  #
+  # Snowflake roles, grants and permissions are managed separately in
+  # ./snowflake/ (its own root module and state).
 }
 
 provider "aws" {

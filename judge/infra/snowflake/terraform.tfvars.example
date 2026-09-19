@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) only if you need to override a
+# default. None of these are secret — the private key stays on disk.
+
+snowflake_organization_name = "yiooglh"
+snowflake_account_name      = "ox90063"
+snowflake_user              = "TERRAFORM_SERVICE"
+private_key_path            = "../../.snowflake/terraform_rsa_key.p8"
+warehouse                   = "SNOWFLAKE_LEARNING_WH"
