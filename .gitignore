@@ -13,5 +13,16 @@ judge/.snowflake/
 .env
 *.env
 
+# Terraform
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.*
+**/terraform.tfvars
+**/*.tfplan
+# NOTE: .terraform.lock.hcl is intentionally NOT ignored — it should be committed
+
+# Claude Code local session state
+.claude/
+
 # OS
 .DS_Store

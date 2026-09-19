@@ -74,15 +74,12 @@ def _get_role_assignments_sample(role: str, path: Path = DEFAULT_SAMPLE_PATH) ->
         raise SnowflakeQueryError(f"Failed to read sample role source: {exc}") from exc
 
 
-def _load_private_key_der(path: str) -> bytes:
-    """Load a PKCS8 PEM private key and return it as DER bytes, as required
-    by snowflake.connector.connect(private_key=...).
+def _load_private_key_der_from_pem(pem_data: bytes) -> bytes:
+    """Convert a PKCS8 PEM private key to DER bytes, as required by
+    snowflake.connector.connect(private_key=...).
     """
     from cryptography.hazmat.backends import default_backend
     from cryptography.hazmat.primitives import serialization
-
-    with open(path, "rb") as f:
-        pem_data = f.read()
 
     passphrase = os.environ.get("SNOWFLAKE_PRIVATE_KEY_PASSPHRASE")
     private_key = serialization.load_pem_private_key(
@@ -100,13 +97,15 @@ def _load_private_key_der(path: str) -> bytes:
 def _get_role_assignments_live(role: str) -> list[RoleAssignment]:
     """Query a real Snowflake account for current grants of `role`.
 
-    Requires SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_WAREHOUSE, and
-    either:
-      - SNOWFLAKE_PRIVATE_KEY_PATH (key-pair auth, preferred for service
-        accounts — bypasses password/MFA policy entirely), or
+    Requires SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_WAREHOUSE, and one
+    of (checked in this order):
+      - SNOWFLAKE_PRIVATE_KEY (the PEM content itself — used in production,
+        where the key comes from Secrets Manager as an env var rather than
+        a file on disk),
+      - SNOWFLAKE_PRIVATE_KEY_PATH (a local PEM file — used for local dev),
       - SNOWFLAKE_PASSWORD (password auth; blocked if the account enforces
-        MFA on password logins).
-    SNOWFLAKE_ROLE is optional in both cases.
+        MFA on password logins, which is the Snowflake default).
+    SNOWFLAKE_ROLE is optional in all cases.
     """
     try:
         import snowflake.connector  # type: ignore[import-not-found]
@@ -121,13 +120,14 @@ def _get_role_assignments_live(role: str) -> list[RoleAssignment]:
     if missing_env:
         raise SnowflakeQueryError(f"Missing required env vars for live Snowflake mode: {missing_env}")
 
+    private_key_content = os.environ.get("SNOWFLAKE_PRIVATE_KEY")
     private_key_path = os.environ.get("SNOWFLAKE_PRIVATE_KEY_PATH")
     password = os.environ.get("SNOWFLAKE_PASSWORD")
-    if not private_key_path and not password:
+    if not private_key_content and not private_key_path and not password:
         raise SnowflakeQueryError(
-            "Missing credentials for live Snowflake mode: set either "
-            "SNOWFLAKE_PRIVATE_KEY_PATH (key-pair auth, preferred) or "
-            "SNOWFLAKE_PASSWORD."
+            "Missing credentials for live Snowflake mode: set one of "
+            "SNOWFLAKE_PRIVATE_KEY, SNOWFLAKE_PRIVATE_KEY_PATH (key-pair "
+            "auth, preferred), or SNOWFLAKE_PASSWORD."
         )
 
     connect_kwargs: dict = dict(
@@ -136,13 +136,18 @@ def _get_role_assignments_live(role: str) -> list[RoleAssignment]:
         warehouse=os.environ["SNOWFLAKE_WAREHOUSE"],
         role=os.environ.get("SNOWFLAKE_ROLE"),
     )
-    if private_key_path:
-        try:
-            connect_kwargs["private_key"] = _load_private_key_der(private_key_path)
-        except Exception as exc:  # noqa: BLE001
-            raise SnowflakeQueryError(f"Failed to load private key from {private_key_path}: {exc}") from exc
-    else:
-        connect_kwargs["password"] = password
+    try:
+        if private_key_content:
+            connect_kwargs["private_key"] = _load_private_key_der_from_pem(private_key_content.encode())
+        elif private_key_path:
+            with open(private_key_path, "rb") as f:
+                connect_kwargs["private_key"] = _load_private_key_der_from_pem(f.read())
+        else:
+            connect_kwargs["password"] = password
+    except SnowflakeQueryError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise SnowflakeQueryError(f"Failed to load Snowflake private key: {exc}") from exc
 
     conn = None
     try:
