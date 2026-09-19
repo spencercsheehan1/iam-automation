@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.git/
+.snowflake/
+judge.db
+tests/
+infra/
+README.md
+run_live_eval.py

@@ -1,0 +1,8 @@
+# Copy to terraform.tfvars (gitignored) and fill in your values.
+# None of these are secret — the Snowflake private key is handled
+# separately via Secrets Manager (see infra/README.md).
+
+snowflake_account   = "orglocator-accountlocator"
+snowflake_user      = "JUDGE_SERVICE"
+snowflake_warehouse = "YOUR_WAREHOUSE"
+snowflake_role      = "SECURITYADMIN"

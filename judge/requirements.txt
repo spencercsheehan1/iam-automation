@@ -5,3 +5,6 @@ pytest>=7.4
 
 # Only needed for JUDGE_MODE=live:
 snowflake-connector-python>=3.6
+
+# Only needed for JUDGE_DB_BACKEND=dynamodb (production):
+boto3>=1.34
