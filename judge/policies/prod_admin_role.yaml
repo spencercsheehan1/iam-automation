@@ -1,0 +1,12 @@
+# Jury: the eligibility policy for PROD_ADMIN_ROLE.
+#
+# A user is eligible for `role` only when every condition under
+# `eligibility` matches their current employee attributes. Comparisons
+# are case-insensitive.
+
+version: "1.0"
+role: PROD_ADMIN_ROLE
+
+eligibility:
+  employment_status: active
+  email: spencer@example.com

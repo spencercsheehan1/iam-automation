@@ -14,7 +14,7 @@ import pandas as pd
 import streamlit as st
 
 import db
-from evaluator import DECISION_ERROR, DECISION_FAIL, DECISION_PASS, PolicyError, evaluate_all, load_policy
+from evaluator import DECISION_ERROR, DECISION_FAIL, DECISION_PASS, PolicyError, evaluate_policies, load_policies
 
 st.set_page_config(page_title="Judge", page_icon="⚖️", layout="wide")
 
@@ -32,11 +32,11 @@ if mode == "sample":
     )
 
 try:
-    policy = load_policy()
-    st.sidebar.markdown("### Jury (policy)")
-    st.sidebar.write(f"**Role:** `{policy.role}`")
-    st.sidebar.write(f"**Policy version:** `{policy.version}`")
-    st.sidebar.json(policy.eligibility)
+    policies = load_policies()
+    st.sidebar.markdown("### Jury (policies)")
+    for policy in policies:
+        with st.sidebar.expander(f"`{policy.role}` (v{policy.version})"):
+            st.json(policy.eligibility)
 except PolicyError as exc:
     st.error(f"Could not load policy: {exc}")
     st.stop()
@@ -55,7 +55,7 @@ with clear_col:
 
 if run_clicked:
     with st.spinner("Judge is evaluating..."):
-        results = evaluate_all(policy)
+        results = evaluate_policies(policies)
         db.save_results(results)
     st.session_state.show_results = True
     st.success(f"Evaluation complete — {len(results)} user(s) evaluated.")
