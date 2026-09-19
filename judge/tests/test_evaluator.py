@@ -5,8 +5,8 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from employee_data import Employee, EmployeeDataError
-from evaluator import (
+from sources.employee_data import Employee, EmployeeDataError
+from engine.evaluator import (
     DECISION_ERROR,
     DECISION_FAIL,
     DECISION_PASS,
@@ -93,7 +93,7 @@ def test_evaluate_all_errors_when_employee_missing(monkeypatch):
     def fake_get_employee(snowflake_username, path=None):
         return None
 
-    import evaluator
+    from engine import evaluator
 
     monkeypatch.setattr(evaluator, "get_employee_by_snowflake_username", fake_get_employee)
     policy = load_policy()
@@ -103,8 +103,8 @@ def test_evaluate_all_errors_when_employee_missing(monkeypatch):
 
 
 def test_evaluate_all_errors_when_snowflake_query_fails(monkeypatch):
-    import evaluator
-    from snowflake_client import SnowflakeQueryError
+    from engine import evaluator
+    from sources.snowflake_client import SnowflakeQueryError
 
     def fake_get_role_assignments(role, mode=None):
         raise SnowflakeQueryError("simulated connection failure")
@@ -119,7 +119,7 @@ def test_evaluate_all_errors_when_snowflake_query_fails(monkeypatch):
 
 
 def test_evaluate_all_errors_when_employee_source_broken(monkeypatch):
-    import evaluator
+    from engine import evaluator
 
     def fake_get_employee(snowflake_username, path=None):
         raise EmployeeDataError("simulated parse failure")
@@ -180,7 +180,7 @@ def test_unknown_attribute_fails_closed():
 
 
 def test_load_policies_loads_all_repo_policies():
-    from evaluator import load_policies
+    from engine.evaluator import load_policies
 
     by_role = {p.role: p for p in load_policies()}
     assert set(by_role) == {
@@ -195,14 +195,14 @@ def test_load_policies_loads_all_repo_policies():
 
 
 def test_load_policies_errors_on_empty_directory(tmp_path):
-    from evaluator import PolicyError, load_policies
+    from engine.evaluator import PolicyError, load_policies
 
     with pytest.raises(PolicyError):
         load_policies(tmp_path)
 
 
 def test_evaluate_policies_end_to_end_sample_data(monkeypatch):
-    from evaluator import evaluate_policies, load_policies
+    from engine.evaluator import evaluate_policies, load_policies
 
     monkeypatch.setenv("JUDGE_MODE", "sample")
     results = evaluate_policies(load_policies())
@@ -219,8 +219,8 @@ def test_evaluate_policies_end_to_end_sample_data(monkeypatch):
 
 
 def test_evaluate_policies_uses_one_timestamp_per_run(monkeypatch):
-    import evaluator
-    from evaluator import evaluate_policies, load_policies
+    from engine import evaluator
+    from engine.evaluator import evaluate_policies, load_policies
 
     monkeypatch.setenv("JUDGE_MODE", "sample")
     stamps = iter(f"2026-01-01T00:00:{i:02d}+00:00" for i in range(60))

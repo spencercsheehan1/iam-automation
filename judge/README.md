@@ -27,11 +27,11 @@ The same process, in technical detail:
 sequenceDiagram
     actor User
     participant UI as app.py (Streamlit)
-    participant Eval as evaluator.py (Judge)
-    participant SF as snowflake_client.py
+    participant Eval as engine/evaluator.py (Judge)
+    participant SF as sources/snowflake_client.py
     participant Snowflake
-    participant Emp as employee_data.py
-    participant DB as db.py
+    participant Emp as sources/employee_data.py
+    participant DB as storage/
     participant Store as DynamoDB
 
     User->>UI: Click "Run Evaluation"
@@ -58,10 +58,10 @@ sequenceDiagram
     UI-->>User: dashboard, metrics, Bailiff recommendations
 ```
 
-If `snowflake_client.py` or `employee_data.py` can't get an answer (a
+If `sources/snowflake_client.py` or `sources/employee_data.py` can't get an answer (a
 down data source, a missing employee record), that becomes `ERROR`
-instead of a silent `PASS` — see the decision table below. `db.py`
-persists results to DynamoDB (`db_dynamo.py`).
+instead of a silent `PASS` — see the decision table below. `storage/`
+persists results to DynamoDB (`storage/dynamodb.py`).
 
 ## How it works
 
@@ -69,7 +69,7 @@ persists results to DynamoDB (`db_dynamo.py`).
   A condition's value may be a list, meaning "any of" (e.g.
   `department: [TRUST, GRC]`); supported attributes are `employment_status`,
   `department`, and `email`. Unknown attributes fail closed.
-- **Judge** — the deterministic evaluation engine (`evaluator.py`) that
+- **Judge** — the deterministic evaluation engine (`engine/evaluator.py`) that
   compares each user's actual attributes and Snowflake access against
   the Jury's policy.
 - **Bailiff** — the remediation surface. On `FAIL`, the dashboard flags
@@ -87,7 +87,7 @@ Every evaluation produces one of three outcomes:
 Results are persisted as an append-only audit trail: `evaluation_id`,
 `user`, `role`, `decision`, `reason`, `policy_version`, `evaluated_at`.
 Storage is a DynamoDB table (survives container restarts/redeploys, shared
-across instances — see `db_dynamo.py` and `infra/dynamodb.tf`). Running the
+across instances — see `storage/dynamodb.py` and `infra/dynamodb.tf`). Running the
 dashboard needs `JUDGE_DYNAMODB_TABLE`, `AWS_REGION` and AWS credentials; the
 evaluator and tests do not touch the database.
 
@@ -115,7 +115,7 @@ Click **Run Evaluation**. With the bundled synthetic data you should see:
 
 (Users are identified by their Snowflake username — `employees.csv`
 maps each one to email/department/status via a `snowflake_username`
-column; see `employee_data.py`.)
+column; see `sources/employee_data.py`.)
 
 ## Run the tests
 
@@ -150,7 +150,7 @@ account on most Snowflake accounts: Snowflake's default MFA policy
 blocks non-interactive password logins outright (`SNOWFLAKE_PASSWORD`
 is still supported as a fallback, but expect
 `Multi-factor authentication is required for this account`). See
-`snowflake_client.py` for the full precedence order and
+`sources/snowflake_client.py` for the full precedence order and
 `infra/README.md` for how the production key gets into Secrets
 Manager.
 

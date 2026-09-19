@@ -2,7 +2,7 @@
 
 The audit-trail backend — a container's local disk doesn't survive
 restarts/redeploys and isn't shared across instances, so results live in a
-managed table. db.py re-exports these functions for app.py.
+managed table. storage/__init__.py re-exports these functions for app.py.
 
 Table layout (single logical partition — evaluation volume here is tiny,
 so a GSI/sharding scheme would be over-engineering for this MVP):
@@ -22,7 +22,7 @@ import json
 import os
 import uuid
 
-from evaluator import EvaluationResult
+from engine.evaluator import EvaluationResult
 
 PARTITION_KEY_VALUE = "EVAL"
 

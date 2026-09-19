@@ -13,8 +13,8 @@ import os
 import pandas as pd
 import streamlit as st
 
-import db
-from evaluator import DECISION_ERROR, DECISION_FAIL, DECISION_PASS, PolicyError, evaluate_policies, load_policies
+import storage
+from engine.evaluator import DECISION_ERROR, DECISION_FAIL, DECISION_PASS, PolicyError, evaluate_policies, load_policies
 
 st.set_page_config(page_title="Judge", page_icon="⚖️", layout="wide")
 
@@ -56,7 +56,7 @@ with clear_col:
 if run_clicked:
     with st.spinner("Judge is evaluating..."):
         results = evaluate_policies(policies)
-        db.save_results(results)
+        storage.save_results(results)
     st.session_state.show_results = True
     st.success(f"Evaluation complete — {len(results)} user(s) evaluated.")
 
@@ -67,7 +67,7 @@ st.header("Latest Evaluation")
 if not st.session_state.show_results:
     st.info("No evaluation shown. Click **Run Evaluation** to get started.")
 else:
-    latest = db.load_latest_run()
+    latest = storage.load_latest_run()
     df = pd.DataFrame(latest)[["user", "role", "decision", "reason", "evaluated_at"]]
     df.columns = ["User", "Snowflake Role", "Decision", "Reason", "Evaluated"]
 
@@ -110,7 +110,7 @@ else:
             st.error(f"**{r['user']}** — {r['reason']}")
 
 st.header("Audit History")
-all_results = db.load_all_results()
+all_results = storage.load_all_results()
 if all_results:
     hist_df = pd.DataFrame(all_results)[
         ["evaluation_id", "user", "role", "decision", "reason", "policy_version", "evaluated_at"]

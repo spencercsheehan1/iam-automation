@@ -12,7 +12,7 @@ import csv
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_EMPLOYEES_PATH = Path(__file__).parent / "data" / "employees.csv"
+DEFAULT_EMPLOYEES_PATH = Path(__file__).resolve().parent.parent / "data" / "employees.csv"
 
 
 @dataclass(frozen=True)
@@ -76,8 +76,8 @@ def get_employee_by_snowflake_username(
 ) -> Employee | None:
     """Look up a single employee by their Snowflake username (case-insensitive).
 
-    This is the identifier `snowflake_client.get_role_assignments()` returns
-    (Snowflake's `grantee_name`), so it's what `evaluator.evaluate_all()`
+    This is the identifier `sources.snowflake_client.get_role_assignments()` returns
+    (Snowflake's `grantee_name`), so it's what `engine.evaluator.evaluate_all()`
     uses to join role assignments back to employee attributes.
     """
     target = snowflake_username.strip().lower()
