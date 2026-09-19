@@ -4,7 +4,7 @@ A lightweight continuous access assurance prototype. Judge continuously
 tests whether a sensitive Snowflake role still matches business policy,
 instead of relying on quarterly, manually rubber-stamped access reviews.
 
-See [`../judge-prd.md`](../judge-prd.md) for the full product spec.
+See [`judge-prd.md`](judge-prd.md) for the full product spec.
 
 **Live in production:** https://judge.spencer-sheehan.com (ECS Fargate +
 ALB, DynamoDB, real Snowflake trial account — see
@@ -32,7 +32,7 @@ sequenceDiagram
     participant Snowflake
     participant Emp as employee_data.py
     participant DB as db.py
-    participant Store as SQLite / DynamoDB
+    participant Store as DynamoDB
 
     User->>UI: Click "Run Evaluation"
     UI->>Eval: evaluate_all(policy)
@@ -61,8 +61,7 @@ sequenceDiagram
 If `snowflake_client.py` or `employee_data.py` can't get an answer (a
 down data source, a missing employee record), that becomes `ERROR`
 instead of a silent `PASS` — see the decision table below. `db.py`
-picks SQLite or DynamoDB per `JUDGE_DB_BACKEND`, transparently to
-everything above it.
+persists results to DynamoDB (`db_dynamo.py`).
 
 ## How it works
 
@@ -87,16 +86,10 @@ Every evaluation produces one of three outcomes:
 
 Results are persisted as an append-only audit trail: `evaluation_id`,
 `user`, `role`, `decision`, `reason`, `policy_version`, `evaluated_at`.
-The storage backend is selected via `JUDGE_DB_BACKEND`:
-
-| Backend | When | Storage |
-|---|---|---|
-| `sqlite` (default) | Local dev, sample mode | Local file `judge.db` |
-| `dynamodb` | Production | DynamoDB table (survives container restarts/redeploys, shared across instances — see `db_dynamo.py` and `infra/dynamodb.tf`) |
-
-A container's local disk doesn't survive restarts/redeploys and isn't
-shared across instances, so production always runs with
-`JUDGE_DB_BACKEND=dynamodb`.
+Storage is a DynamoDB table (survives container restarts/redeploys, shared
+across instances — see `db_dynamo.py` and `infra/dynamodb.tf`). Running the
+dashboard needs `JUDGE_DYNAMODB_TABLE`, `AWS_REGION` and AWS credentials; the
+evaluator and tests do not touch the database.
 
 ## Setup
 
@@ -171,7 +164,8 @@ must not look like a healthy control.
 ```bash
 docker build -t judge:local .
 docker run -p 8501:8501 \
-  -e JUDGE_MODE=sample -e JUDGE_DB_BACKEND=sqlite \
+  -e JUDGE_MODE=sample -e JUDGE_DYNAMODB_TABLE=<table> -e AWS_REGION=us-east-1 \
+  -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_SESSION_TOKEN \
   judge:local
 ```
 
