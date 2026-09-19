@@ -12,7 +12,7 @@ ALB, DynamoDB, real Snowflake trial account — see
 
 ## How it works at a glance
 
-![Process flow: start a check, ask Snowflake who holds the role, look up each person, compare to policy, then PASS, FAIL or ERROR, save the results and show the dashboard](docs/judge-process-flow.png)
+![Process flow: start a check, ask Snowflake who holds the role, look up each person, compare to policy, then PASS, FAIL or ERROR, save the results and show the dashboard](docs/judge-process-flow.svg)
 
 Each time someone clicks **Run Evaluation**, Judge finds everyone who holds
 a sensitive access role, checks each person against the written policy, and
