@@ -95,6 +95,13 @@ command aws ecs update-service --profile harvey-admin --region us-east-1 \
   --cluster judge --service judge --force-new-deployment
 ```
 
+## Snowflake roles and permissions
+
+Snowflake roles, user grants and least-privilege permissions are managed by a
+separate Terraform root module in [`snowflake/`](snowflake/README.md) (own
+state, key-pair auth as `TERRAFORM_SERVICE`). It is independent of everything
+above.
+
 ## Subsequent deploys
 
 Code change → rebuild → push → force a new ECS deployment (`deploy.sh`
