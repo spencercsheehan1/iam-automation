@@ -7,7 +7,7 @@ credentials.
 
 | Managed here | Not managed here |
 |---|---|
-| One role per `../../policies/*.yaml` (`role:` = role name) | The Snowflake users themselves (must already exist) |
+| One role per `../../policies/*.yaml` (`role:` = role name) | The Snowflake users themselves (must already exist: `ALICE`, `ANGELA`, `BOB`, `JOSHUA`, `SPENCER`) |
 | Demo database `PROD_DATA` with `FINANCE`, `MARKETING`, `ANALYTICS` schemas + one table each | `JUDGE_SERVICE` (the read-only service account the app uses) |
 | Least-privilege grants per role (`privileges.tf`) | The warehouse (referenced, only granted `USAGE`) |
 | Legitimate user → role grants (`grants.tf`) | "Rogue" demo grants — make those by hand in the Snowflake UI |
@@ -24,7 +24,7 @@ never silently get no permissions or too many.
 | `PROD_MARKETING_RO_ROLE` | `USAGE` on database + warehouse; `USAGE` / `SELECT` on `MARKETING` |
 | `PROD_AUDITOR_RO_ROLE` | `USAGE` on database + warehouse; `USAGE` / `SELECT` on all three schemas |
 | `PROD_ANALYTICS_ROLE` | `USAGE` on database + warehouse; `SELECT`/`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` + `CREATE TABLE` on `ANALYTICS` |
-| `PROD_ADMIN_ROLE` | Account-level `CREATE USER`, `CREATE ROLE`, `MONITOR USAGE`. No data access, no `MANAGE GRANTS` |
+| `PROD_ADMIN_ROLE` | Account-level `CREATE USER`, `CREATE ROLE`. No data access, no `MANAGE GRANTS` |
 
 Table grants cover both existing and future tables.
 
@@ -64,6 +64,32 @@ Terraform authenticates as a dedicated `TERRAFORM_SERVICE` user so the app's
    (If `TYPE = SERVICE` isn't available on your account, drop that line.)
 
 ## Apply
+
+Create any missing users first (Terraform grants roles to users but doesn't create them):
+
+```sql
+USE ROLE SECURITYADMIN;
+CREATE USER IF NOT EXISTS ANGELA;
+CREATE USER IF NOT EXISTS JOSHUA;
+CREATE USER IF NOT EXISTS SPENCER;
+```
+
+If you have `SNOWFLAKE_*` variables exported for Judge's live mode (especially
+`SNOWFLAKE_PASSWORD`), the Terraform provider reads them and fails with
+"`password` conflicts with `private_key`". Unset them for the command:
+
+```bash
+env -u SNOWFLAKE_PASSWORD -u SNOWFLAKE_ACCOUNT -u SNOWFLAKE_USER \
+    -u SNOWFLAKE_WAREHOUSE -u SNOWFLAKE_ROLE -u SNOWFLAKE_PRIVATE_KEY_PATH terraform plan
+```
+
+Also, `PROD_ANALYTICS_ROLE` must be owned by `SECURITYADMIN` before the first apply
+(it was created by hand as `ACCOUNTADMIN`):
+
+```sql
+USE ROLE ACCOUNTADMIN;
+GRANT OWNERSHIP ON ROLE PROD_ANALYTICS_ROLE TO ROLE SECURITYADMIN COPY CURRENT GRANTS;
+```
 
 ```bash
 cd judge/infra/snowflake
