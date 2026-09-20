@@ -67,7 +67,9 @@ st.header("Latest Evaluation")
 if not st.session_state.show_results:
     st.info("No evaluation shown. Click **Run Evaluation** to get started.")
 else:
-    latest = storage.load_latest_run()
+    # Group by person: sort by user (then role), case-insensitively. The
+    # Bailiff and error lists below are built from this, so they follow suit.
+    latest = sorted(storage.load_latest_run(), key=lambda r: (r["user"].lower(), r["role"].lower()))
     df = pd.DataFrame(latest)[["user", "role", "decision", "reason", "evaluated_at"]]
     df.columns = ["User", "Snowflake Role", "Decision", "Reason", "Evaluated"]
 
