@@ -16,7 +16,7 @@ locals {
       write_schemas      = []
       account_privileges = []
     }
-    PROD_AUDITOR_RO_ROLE = {
+    PROD_TRUST_RO_ROLE = {
       read_schemas       = ["FINANCE", "MARKETING", "ANALYTICS"]
       write_schemas      = []
       account_privileges = []

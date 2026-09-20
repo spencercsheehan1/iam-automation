@@ -131,8 +131,8 @@ def test_evaluate_all_errors_when_employee_source_broken(monkeypatch):
     assert all(r.decision == DECISION_ERROR for r in results)
 
 
-AUDITOR_POLICY = Policy(
-    role="PROD_AUDITOR_RO_ROLE",
+TRUST_POLICY = Policy(
+    role="PROD_TRUST_RO_ROLE",
     version="1.0",
     eligibility={"employment_status": "active", "department": ["TRUST", "GRC"]},
 )
@@ -146,12 +146,12 @@ ADMIN_POLICY = Policy(
 
 @pytest.mark.parametrize("dept", ["TRUST", "GRC", "grc"])
 def test_list_valued_department_passes_on_any_match(dept):
-    decision, _ = evaluate_employee(make_employee(department=dept), AUDITOR_POLICY)
+    decision, _ = evaluate_employee(make_employee(department=dept), TRUST_POLICY)
     assert decision == DECISION_PASS
 
 
 def test_list_valued_department_fails_when_none_match():
-    decision, reason = evaluate_employee(make_employee(department="Data"), AUDITOR_POLICY)
+    decision, reason = evaluate_employee(make_employee(department="Data"), TRUST_POLICY)
     assert decision == DECISION_FAIL
     assert "department_expected=TRUST|GRC" in reason
 
@@ -186,11 +186,11 @@ def test_load_policies_loads_all_repo_policies():
     assert set(by_role) == {
         "PROD_ANALYTICS_ROLE",
         "PROD_ACCOUNTING_RO_ROLE",
-        "PROD_AUDITOR_RO_ROLE",
+        "PROD_TRUST_RO_ROLE",
         "PROD_MARKETING_RO_ROLE",
         "PROD_ADMIN_ROLE",
     }
-    assert by_role["PROD_AUDITOR_RO_ROLE"].eligibility["department"] == ["TRUST", "GRC"]
+    assert by_role["PROD_TRUST_RO_ROLE"].eligibility["department"] == ["TRUST", "GRC"]
     assert by_role["PROD_ADMIN_ROLE"].eligibility["email"] == "spencer@example.com"
 
 
@@ -212,8 +212,8 @@ def test_evaluate_policies_end_to_end_sample_data(monkeypatch):
     assert by_key[("BOB", "PROD_ANALYTICS_ROLE")] == DECISION_FAIL
     assert by_key[("ANGELA", "PROD_ACCOUNTING_RO_ROLE")] == DECISION_PASS
     assert by_key[("BOB", "PROD_MARKETING_RO_ROLE")] == DECISION_PASS
-    assert by_key[("JOSHUA", "PROD_AUDITOR_RO_ROLE")] == DECISION_PASS
-    assert by_key[("SPENCER", "PROD_AUDITOR_RO_ROLE")] == DECISION_PASS
+    assert by_key[("JOSHUA", "PROD_TRUST_RO_ROLE")] == DECISION_PASS
+    assert by_key[("SPENCER", "PROD_TRUST_RO_ROLE")] == DECISION_PASS
     assert by_key[("SPENCER", "PROD_ADMIN_ROLE")] == DECISION_PASS
     assert by_key[("WINSTON", "PROD_ADMIN_ROLE")] == DECISION_FAIL
 
