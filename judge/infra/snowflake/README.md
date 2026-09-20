@@ -22,7 +22,7 @@ never silently get no permissions or too many.
 |---|---|
 | `PROD_ACCOUNTING_RO_ROLE` | `USAGE` on database + warehouse; `USAGE` / `SELECT` on `FINANCE` |
 | `PROD_MARKETING_RO_ROLE` | `USAGE` on database + warehouse; `USAGE` / `SELECT` on `MARKETING` |
-| `PROD_AUDITOR_RO_ROLE` | `USAGE` on database + warehouse; `USAGE` / `SELECT` on all three schemas |
+| `PROD_TRUST_RO_ROLE` | `USAGE` on database + warehouse; `USAGE` / `SELECT` on all three schemas |
 | `PROD_ANALYTICS_ROLE` | `USAGE` on database + warehouse; `SELECT`/`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE` + `CREATE TABLE` on `ANALYTICS` |
 | `PROD_ADMIN_ROLE` | Account-level `CREATE USER`, `CREATE ROLE`. No data access, no `MANAGE GRANTS` |
 

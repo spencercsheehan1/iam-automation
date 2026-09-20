@@ -1,11 +1,11 @@
-# Jury: the eligibility policy for PROD_AUDITOR_RO_ROLE.
+# Jury: the eligibility policy for PROD_TRUST_RO_ROLE.
 #
 # A user is eligible for `role` only when every condition under
 # `eligibility` matches their current employee attributes. Comparisons
 # are case-insensitive.
 
 version: "1.0"
-role: PROD_AUDITOR_RO_ROLE
+role: PROD_TRUST_RO_ROLE
 
 eligibility:
   employment_status: active
