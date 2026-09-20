@@ -19,7 +19,7 @@ from engine.evaluator import DECISION_ERROR, DECISION_FAIL, DECISION_PASS, Polic
 st.set_page_config(page_title="Judge", page_icon="⚖️", layout="wide")
 
 st.title("⚖️ Judge")
-st.caption("Continuous access assurance — does this user still satisfy the policy for this access?")
+st.caption("Continuous access assurance — do all snowflake users still satisfy our current access polices?")
 
 mode = os.environ.get("JUDGE_MODE", "sample")
 st.sidebar.markdown("### Configuration")
