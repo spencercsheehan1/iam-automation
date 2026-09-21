@@ -36,7 +36,7 @@ try:
     st.sidebar.markdown("### Jury (policies)")
     for policy in policies:
         with st.sidebar.expander(f"`{policy.role}` (v{policy.version})"):
-            st.json(policy.eligibility)
+            st.json({"allowed_users": list(policy.allowed_users)} if policy.allowed_users else policy.eligibility)
 except PolicyError as exc:
     st.error(f"Could not load policy: {exc}")
     st.stop()
