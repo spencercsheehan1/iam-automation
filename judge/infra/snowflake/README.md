@@ -16,6 +16,11 @@ Adding a policy file adds the role, but `terraform plan` **fails** until the
 role also has an entry in `local.role_access` (`privileges.tf`) — a new role can
 never silently get no permissions or too many.
 
+Exception: policies for Snowflake's built-in roles (`ACCOUNTADMIN`,
+`SECURITYADMIN`, etc. — `local.builtin_roles` in `roles.tf`) are skipped.
+Those roles already exist and aren't ours to create or grant; Judge still
+evaluates who holds them.
+
 ## Permissions
 
 | Role | Privileges |

@@ -33,6 +33,10 @@ class Policy:
     # Each value is a single expected string, or a list of strings meaning
     # "any of these" (e.g. department: [TRUST, GRC]).
     eligibility: dict[str, str | list[str]]
+    # Named-holder policies (e.g. ACCOUNTADMIN): the only Snowflake users
+    # allowed to hold the role. Decided by name, with no HR lookup, so it
+    # works for service accounts that have no employee record.
+    allowed_users: tuple[str, ...] = ()
 
 
 class PolicyError(Exception):
@@ -48,13 +52,21 @@ def load_policy(path: Path = DEFAULT_POLICY_PATH) -> Policy:
     except Exception as exc:  # noqa: BLE001
         raise PolicyError(f"Failed to parse policy file: {exc}") from exc
 
-    if not raw or "role" not in raw or "eligibility" not in raw:
-        raise PolicyError(f"Policy file missing required keys 'role'/'eligibility': {path}")
+    if not raw or "role" not in raw:
+        raise PolicyError(f"Policy file missing required key 'role': {path}")
+    # Exactly one decision mode: attribute rules or a named allowlist.
+    if ("eligibility" in raw) == ("allowed_users" in raw):
+        raise PolicyError(f"Policy file must set exactly one of 'eligibility'/'allowed_users': {path}")
+
+    allowed_users = raw.get("allowed_users")
+    if allowed_users is not None and (not isinstance(allowed_users, list) or not allowed_users):
+        raise PolicyError(f"'allowed_users' must be a non-empty list: {path}")
 
     return Policy(
         role=str(raw["role"]),
         version=str(raw.get("version", "unknown")),
-        eligibility=dict(raw["eligibility"]),
+        eligibility=dict(raw.get("eligibility") or {}),
+        allowed_users=tuple(str(u) for u in allowed_users or ()),
     )
 
 
@@ -111,6 +123,18 @@ def evaluate_employee(employee: Employee, policy: Policy) -> tuple[str, str]:
     return DECISION_PASS, "User satisfies all eligibility requirements."
 
 
+def evaluate_named_holder(username: str, policy: Policy) -> tuple[str, str]:
+    """Apply an ``allowed_users`` policy: PASS only for a listed user.
+
+    Case-insensitive — Snowflake returns quoted user names (e.g. an
+    account's signup user) in their original lowercase.
+    """
+    allowed = {u.strip().lower() for u in policy.allowed_users}
+    if username.strip().lower() in allowed:
+        return DECISION_PASS, "User is an approved holder of this role."
+    return DECISION_FAIL, f"user_expected={'|'.join(policy.allowed_users)}, user_actual={username}"
+
+
 def evaluate_policies(policies: list[Policy]) -> list[EvaluationResult]:
     """Evaluate every policy and concatenate the results, in policy order.
 
@@ -151,6 +175,20 @@ def evaluate_all(policy: Policy | None = None, evaluated_at: str | None = None) 
         return results
 
     for assignment in assignments:
+        if policy.allowed_users:
+            decision, reason = evaluate_named_holder(assignment.user, policy)
+            results.append(
+                EvaluationResult(
+                    user=assignment.user,
+                    role=assignment.assigned_role,
+                    decision=decision,
+                    reason=reason,
+                    policy_version=policy.version,
+                    evaluated_at=now,
+                )
+            )
+            continue
+
         try:
             employee = get_employee_by_snowflake_username(assignment.user)
         except EmployeeDataError as exc:

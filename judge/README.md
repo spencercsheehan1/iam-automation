@@ -68,7 +68,10 @@ persists results to DynamoDB (`storage/dynamodb.py`).
 - **Jury** — the eligibility policies, one YAML file per role in `policies/`.
   A condition's value may be a list, meaning "any of" (e.g.
   `department: [TRUST, GRC]`); supported attributes are `employment_status`,
-  `department`, and `email`. Unknown attributes fail closed.
+  `department`, and `email`. Unknown attributes fail closed. A policy can
+  instead list `allowed_users` (e.g. `ACCOUNTADMIN`, `SECURITYADMIN`): only
+  those Snowflake users may hold the role, decided by name with no HR
+  lookup, so service accounts can be covered too.
 - **Judge** — the deterministic evaluation engine (`engine/evaluator.py`) that
   compares each user's actual attributes and Snowflake access against
   the Jury's policy.

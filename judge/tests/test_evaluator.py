@@ -189,9 +189,70 @@ def test_load_policies_loads_all_repo_policies():
         "PROD_TRUST_RO_ROLE",
         "PROD_MARKETING_RO_ROLE",
         "PROD_ADMIN_ROLE",
+        "ACCOUNTADMIN",
+        "SECURITYADMIN",
     }
     assert by_role["PROD_TRUST_RO_ROLE"].eligibility["department"] == ["TRUST", "GRC"]
     assert by_role["PROD_ADMIN_ROLE"].eligibility["email"] == "spencer@example.com"
+    assert by_role["ACCOUNTADMIN"].allowed_users == ("spencercsheehan",)
+    assert by_role["SECURITYADMIN"].allowed_users == ("JUDGE_SERVICE", "TERRAFORM_SERVICE")
+
+
+NAMED_POLICY = Policy(role="SECURITYADMIN", version="1.0", eligibility={}, allowed_users=("JUDGE_SERVICE",))
+
+
+@pytest.mark.parametrize("username", ["JUDGE_SERVICE", "judge_service", " Judge_Service "])
+def test_named_holder_passes_listed_user_case_insensitively(username):
+    from engine.evaluator import evaluate_named_holder
+
+    decision, _ = evaluate_named_holder(username, NAMED_POLICY)
+    assert decision == DECISION_PASS
+
+
+def test_named_holder_fails_unlisted_user():
+    from engine.evaluator import evaluate_named_holder
+
+    decision, reason = evaluate_named_holder("WINSTON", NAMED_POLICY)
+    assert decision == DECISION_FAIL
+    assert "user_actual=WINSTON" in reason
+
+
+def test_named_holder_policy_skips_hr_lookup(monkeypatch):
+    """Service accounts have no employee record — that must not become ERROR."""
+    from engine import evaluator
+    from sources.snowflake_client import RoleAssignment
+
+    monkeypatch.setattr(
+        evaluator,
+        "get_role_assignments",
+        lambda role, mode=None: [RoleAssignment("JUDGE_SERVICE", role), RoleAssignment("ROGUE", role)],
+    )
+
+    def hr_must_not_be_called(_):
+        raise AssertionError("HR lookup called for a named-holder policy")
+
+    monkeypatch.setattr(evaluator, "get_employee_by_snowflake_username", hr_must_not_be_called)
+
+    by_user = {r.user: r.decision for r in evaluate_all(NAMED_POLICY)}
+    assert by_user == {"JUDGE_SERVICE": DECISION_PASS, "ROGUE": DECISION_FAIL}
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "role: R\n",  # neither mode
+        "role: R\neligibility: {department: Data}\nallowed_users: [A]\n",  # both modes
+        "role: R\nallowed_users: []\n",  # empty allowlist
+        "role: R\nallowed_users: A\n",  # not a list
+    ],
+)
+def test_load_policy_rejects_invalid_decision_mode(tmp_path, body):
+    from engine.evaluator import PolicyError
+
+    path = tmp_path / "p.yaml"
+    path.write_text(body)
+    with pytest.raises(PolicyError):
+        load_policy(path)
 
 
 def test_load_policies_errors_on_empty_directory(tmp_path):
@@ -216,6 +277,9 @@ def test_evaluate_policies_end_to_end_sample_data(monkeypatch):
     assert by_key[("SPENCER", "PROD_TRUST_RO_ROLE")] == DECISION_PASS
     assert by_key[("SPENCER", "PROD_ADMIN_ROLE")] == DECISION_PASS
     assert by_key[("WINSTON", "PROD_ADMIN_ROLE")] == DECISION_FAIL
+    assert by_key[("spencercsheehan", "ACCOUNTADMIN")] == DECISION_PASS
+    assert by_key[("JUDGE_SERVICE", "SECURITYADMIN")] == DECISION_PASS
+    assert by_key[("TERRAFORM_SERVICE", "SECURITYADMIN")] == DECISION_PASS
 
 
 def test_evaluate_policies_uses_one_timestamp_per_run(monkeypatch):

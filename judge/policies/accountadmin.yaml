@@ -1,0 +1,11 @@
+# Jury: the eligibility policy for ACCOUNTADMIN.
+#
+# A named-holder policy: only the users listed under `allowed_users` may
+# hold `role`. Decided by Snowflake user name (case-insensitive), with no
+# HR lookup. Built-in Snowflake role, so Terraform does not manage it.
+
+version: "1.0"
+role: ACCOUNTADMIN
+
+allowed_users:
+  - spencercsheehan
