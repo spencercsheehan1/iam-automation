@@ -3,8 +3,8 @@
 # variable or resource attribute — that would land it in the local
 # state file in plaintext. Instead:
 #   1. Terraform creates an empty secret (this resource).
-#   2. You populate its real value out-of-band via `deploy.sh` /
-#      `aws secretsmanager put-secret-value` (see infra/README.md).
+#   2. You populate its real value out-of-band via `set_snowflake_key.sh`
+#      (which calls `aws secretsmanager put-secret-value`; see infra/README.md).
 #   3. `lifecycle.ignore_changes` tells Terraform to never touch the
 #      value again, so `terraform apply` can't accidentally wipe it.
 resource "aws_secretsmanager_secret" "snowflake_private_key" {

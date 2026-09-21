@@ -1,6 +1,6 @@
 resource "aws_ecr_repository" "judge" {
   name                 = var.app_name
-  image_tag_mutability = "MUTABLE" # App Runner auto-deploy watches this tag for new pushes
+  image_tag_mutability = "MUTABLE" # deploy.sh re-pushes :latest, then forces a new ECS deployment to pick it up
 
   image_scanning_configuration {
     scan_on_push = true
