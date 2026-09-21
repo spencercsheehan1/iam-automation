@@ -35,6 +35,8 @@ resource "aws_ecs_task_definition" "judge" {
         { name = "SNOWFLAKE_WAREHOUSE", value = var.snowflake_warehouse },
         { name = "SNOWFLAKE_ROLE", value = var.snowflake_role },
         { name = "AWS_REGION", value = var.aws_region },
+        # Dashboard runs publish alerts here directly (app.py); the daily run alerts via alerts.tf.
+        { name = "JUDGE_ALERTS_TOPIC_ARN", value = aws_sns_topic.alerts.arn },
       ]
 
       # Secrets Manager values injected as env vars at container start —

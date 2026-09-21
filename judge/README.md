@@ -130,6 +130,11 @@ audit trail) and exits non-zero on a crash (1), any `ERROR` (2), any
 (EventBridge Scheduler → Fargate task → EventBridge rule → SNS). See
 [`infra/README.md`](infra/README.md#daily-scheduled-run-and-alerts).
 
+Clicking **Run Evaluation** in the dashboard emails the same alert
+(listing each non-PASS user) when `JUDGE_ALERTS_TOPIC_ARN` is set, as it
+is in production; the dashboard publishes to the SNS topic directly.
+Locally, with the variable unset, no email is sent.
+
 Run it locally the same way:
 
 ```bash
