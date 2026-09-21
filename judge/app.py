@@ -75,9 +75,10 @@ else:
 
     def _highlight(row: pd.Series) -> list[str]:
         color = {
-            DECISION_PASS: "background-color: #d4edda",
-            DECISION_FAIL: "background-color: #f8d7da",
-            DECISION_ERROR: "background-color: #fff3cd",
+            # Deep tints + explicit white text: readable in light and dark themes.
+            DECISION_PASS: "background-color: #2e6b3f; color: #ffffff",
+            DECISION_FAIL: "background-color: #8b2e3a; color: #ffffff",
+            DECISION_ERROR: "background-color: #7a5c12; color: #ffffff",
         }.get(row["Decision"], "")
         return [color] * len(row)
 
