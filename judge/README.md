@@ -120,6 +120,22 @@ Click **Run Evaluation**. With the bundled synthetic data you should see:
 maps each one to email/department/status via a `snowflake_username`
 column; see `sources/employee_data.py`.)
 
+## Scheduled runs and alerts
+
+In production Judge also runs **once a day at 11:00 AM Pacific** without
+anyone clicking the button. `run_evaluation.py` does the same work as
+**Run Evaluation** (evaluate every policy and save the results to the
+audit trail) and exits non-zero on a crash (1), any `ERROR` (2), any
+`FAIL` (3) or zero users evaluated (4). AWS turns a non-zero exit into an email alert
+(EventBridge Scheduler → Fargate task → EventBridge rule → SNS). See
+[`infra/README.md`](infra/README.md#daily-scheduled-run-and-alerts).
+
+Run it locally the same way:
+
+```bash
+python run_evaluation.py; echo "exit code: $?"
+```
+
 ## Run the tests
 
 ```bash
@@ -181,7 +197,8 @@ Production infra is Terraform-managed in [`infra/`](infra/) — ECS
 Fargate behind an ALB (not App Runner: it doesn't support the
 WebSocket connections Streamlit needs, see `infra/README.md` for what
 that looked like and why it was replaced), DynamoDB, ECR, Secrets
-Manager, and HTTPS via a Route 53 + ACM-managed custom domain. Full
+Manager, and HTTPS via a Route 53 + ACM-managed custom domain, plus
+the daily EventBridge Scheduler run and SNS email alerts. Full
 architecture, deploy steps, and cost breakdown: `infra/README.md`.
 
 ## Non-goals (MVP)

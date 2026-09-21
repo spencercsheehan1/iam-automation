@@ -125,7 +125,6 @@ else:
 
 st.divider()
 st.caption(
-    "Architecture note: this manual trigger stands in for a scheduled job "
-    "(e.g. GitHub Actions, Airflow, or Azure Functions) that would run "
-    "Judge automatically, such as daily."
+    "Judge also runs automatically once a day (EventBridge Scheduler, 11:00 AM "
+    "Pacific) and emails an alert on any FAIL or ERROR; this button runs it on demand."
 )

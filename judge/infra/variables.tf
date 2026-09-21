@@ -61,3 +61,21 @@ variable "route53_zone_id" {
   type        = string
   default     = "Z0984600KXJ4CXHKZJO5" # spencer-sheehan.com, account 844670296817 (profile "general")
 }
+
+variable "schedule_expression" {
+  description = "When the daily headless evaluation runs (EventBridge Scheduler syntax)."
+  type        = string
+  default     = "cron(0 11 * * ? *)"
+}
+
+variable "schedule_timezone" {
+  description = "IANA time zone for schedule_expression (handles daylight saving)."
+  type        = string
+  default     = "America/Los_Angeles"
+}
+
+variable "alert_email" {
+  description = "Email address subscribed to the alerts SNS topic (must confirm the subscription once)."
+  type        = string
+  default     = "spencercsheehan@gmail.com"
+}
