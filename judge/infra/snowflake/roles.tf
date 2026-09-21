@@ -1,12 +1,18 @@
 # One Snowflake role per policy file in judge/policies/ — the file's
 # `role:` value is the role name, so adding a policy file adds the role.
+# Policies for Snowflake's built-in roles (local.builtin_roles) are skipped.
 
 locals {
   policies_dir = "${path.module}/../../policies"
 
+  # Snowflake's system roles already exist and can't be created or owned
+  # here. Judge still evaluates their policies; Terraform skips them.
+  builtin_roles = toset(["ACCOUNTADMIN", "ORGADMIN", "PUBLIC", "SECURITYADMIN", "SYSADMIN", "USERADMIN"])
+
   policy_roles = toset([
     for f in fileset(local.policies_dir, "*.yaml") :
     yamldecode(file("${local.policies_dir}/${f}")).role
+    if !contains(local.builtin_roles, yamldecode(file("${local.policies_dir}/${f}")).role)
   ])
 }
 
