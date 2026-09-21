@@ -2,7 +2,9 @@
 
 Runs Judge as an always-on container on **ECS Fargate behind an ALB**,
 backed by **DynamoDB** for the audit trail and **Secrets Manager** for
-the Snowflake private key. All resources live in AWS account
+the Snowflake private key. The same image also runs **once a day** as
+a headless one-off task (EventBridge Scheduler), and emails an alert
+via **SNS** if that run crashes or finds any FAIL/ERROR. All resources live in AWS account
 `280655609003` (`harvey-admin` profile), region `us-east-1`.
 
 > **Note on App Runner:** this originally ran on AWS App Runner, which
@@ -25,6 +27,14 @@ Internet ──HTTPS──▶ ALB ──▶ ECS Fargate task (0.25 vCPU / 0.5 GB
      │                              └──▶ Snowflake (SHOW GRANTS OF ROLE, key-pair auth)
      │
      └── judge.spencer-sheehan.com (Route 53 alias → ALB, ACM cert, DNS validation)
+
+EventBridge Scheduler (daily, 11:00 America/Los_Angeles)
+     │  ecs:RunTask, command override: python run_evaluation.py
+     ▼
+One-off Fargate task (same task def, group "judge-daily") ──▶ DynamoDB, Secrets Manager, Snowflake
+     │  STOPPED with exit code ≠ 0 (crash or any FAIL/ERROR), or failed to start
+     ▼
+EventBridge rule "judge-daily-run-failed" ──▶ SNS topic "judge-alerts" ──▶ email
 ```
 
 Runs in the account's **default VPC**, public subnets, with the Fargate
@@ -55,6 +65,9 @@ sync when the infrastructure changes. Each arrow, by its label in the diagram:
 | Audit rows | Fargate task → DynamoDB | Task role writes/reads audit-trail rows in `judge-evaluations` |
 | Monitor logs | Fargate task → CloudWatch Logs | Container stdout/stderr to `/ecs/judge` |
 | A alias, DNS validation, TLS cert | Route 53 → ALB / ACM → ALB | One-time DNS records and the certificate the ALB serves |
+| Daily RunTask | EventBridge Scheduler → Fargate task | 11:00 AM Pacific, starts a one-off task running `python run_evaluation.py` (same image, roles and flows as above, minus the ALB) |
+| Task stopped (exit ≠ 0) | Fargate task → EventBridge rule | ECS emits a `Task State Change` event; the rule matches failed `judge-daily` tasks only |
+| Alert | EventBridge rule → SNS → Email | SNS emails the subscribed address with the exit code, stop reason and where to look |
 
 Out-of-band flows: `deploy.sh` pushes the image to ECR and forces a new ECS
 deployment; `set_snowflake_key.sh` writes the real key into Secrets Manager;
@@ -69,7 +82,7 @@ Everything in `judge/infra/` (the AWS root module; run Terraform from here).
 | File | Purpose |
 |------|---------|
 | `versions.tf` | Terraform/provider version pins, the default `aws` provider (`harvey-admin` profile) and the `aws.dns` alias (`general` profile) for the Route 53 records. Also documents why state is local |
-| `variables.tf` | Input variables: region, app name, image tag, Fargate CPU/memory, Snowflake account/user/warehouse/role, domain name, Route 53 zone ID |
+| `variables.tf` | Input variables: region, app name, image tag, Fargate CPU/memory, Snowflake account/user/warehouse/role, domain name, Route 53 zone ID, daily schedule + time zone, alert email |
 | `vpc.tf` | Looks up the account's default VPC/subnets (no custom VPC, no NAT) and defines the two security groups: `judge-alb` (80/443 from the internet) and `judge-fargate-service` (8501 from the ALB only) |
 | `alb.tf` | Application Load Balancer, target group (port 8501, `/_stcore/health` check, 300s idle timeout for WebSockets), HTTP listener that redirects to HTTPS, and the HTTPS listener that forwards to the task |
 | `dns.tf` | ACM certificate (in the app account), its DNS validation records and the `judge.spencer-sheehan.com` A alias to the ALB (both records in the domain's account via `aws.dns`) |
@@ -78,7 +91,9 @@ Everything in `judge/infra/` (the AWS root module; run Terraform from here).
 | `iam.tf` | Two roles: the **execution role** (pull image, write logs, read the Snowflake key secret at startup) and the **task role** (least-privilege DynamoDB access for the running container) |
 | `dynamodb.tf` | `judge-evaluations` audit-trail table (`pk`/`sk` keys, on-demand billing, point-in-time recovery) |
 | `secrets.tf` | Empty Secrets Manager secret for the Snowflake private key, with `ignore_changes` so Terraform never overwrites the real value |
-| `outputs.tf` | Values printed after `apply`: service URL, ALB DNS name, ECS cluster/service names, ECR URL, DynamoDB table name, secret ARN |
+| `schedule.tf` | EventBridge Scheduler schedule for the daily headless run (`judge-daily`, command override `python run_evaluation.py`) and its IAM role (`ecs:RunTask` on the Judge task def + `iam:PassRole` on the two ECS roles) |
+| `alerts.tf` | SNS topic `judge-alerts` + email subscription, EventBridge rule matching a failed scheduled task, the rule → SNS target (readable message via input transformer) and the topic policy allowing only that rule to publish |
+| `outputs.tf` | Values printed after `apply`: service URL, ALB DNS name, ECS cluster/service names, ECR URL, DynamoDB table name, secret ARN, daily schedule name, alerts topic ARN |
 
 ### Scripts
 
@@ -167,6 +182,51 @@ command aws ecs update-service --profile harvey-admin --region us-east-1 \
   --cluster judge --service judge --force-new-deployment
 ```
 
+**Confirm the alert email subscription.** `terraform apply` sends an
+"AWS Notification - Subscription Confirmation" email to `alert_email`;
+click the link in it. Until then SNS silently drops alerts (the
+subscription shows as `PendingConfirmation`).
+
+## Daily scheduled run and alerts
+
+`schedule.tf` runs the evaluation every day at 11:00 AM Pacific
+(`schedule_expression` / `schedule_timezone`) as a one-off Fargate task
+from the dashboard's task definition, with the command overridden to
+`python run_evaluation.py` (the Dockerfile uses `CMD` rather than
+`ENTRYPOINT` so this override works). The script saves results to the
+same DynamoDB audit trail (they appear under Audit History in the
+dashboard) and its exit code says what happened; the alert email
+includes it:
+
+| Exit code | Meaning |
+|-----------|---------|
+| 0 | All PASS, no email |
+| 1 | The run crashed (uncaught exception, e.g. DynamoDB unreachable or a bad policy file) |
+| 2 | At least one `ERROR`: a data source was broken (takes precedence over FAIL) |
+| 3 | At least one `FAIL`: someone holds access the policy doesn't allow |
+| 4 | Zero users evaluated: an empty grant list can hide a broken pipeline |
+
+An unresolved FAIL emails again every day until the access is revoked (intended).
+
+`alerts.tf` turns that exit code into an email: an EventBridge rule
+matches `ECS Task State Change` events for `STOPPED` tasks in group
+`judge-daily` with a non-zero exit code (or `TaskFailedToStart`) and
+publishes to the `judge-alerts` SNS topic. The email says what happened;
+the per-user details are in the task's log stream in `/ecs/judge`.
+
+Run it on demand (same thing the schedule does, including the alert):
+
+```bash
+SUBNETS=$(command aws ec2 describe-subnets --profile harvey-admin --region us-east-1 \
+  --filters Name=default-for-az,Values=true --query 'Subnets[].SubnetId' --output text | tr '\t' ,)
+SG=$(command aws ec2 describe-security-groups --profile harvey-admin --region us-east-1 \
+  --filters Name=group-name,Values=judge-fargate-service --query 'SecurityGroups[0].GroupId' --output text)
+command aws ecs run-task --profile harvey-admin --region us-east-1 \
+  --cluster judge --task-definition judge --launch-type FARGATE --group judge-daily \
+  --network-configuration "awsvpcConfiguration={subnets=[$SUBNETS],securityGroups=[$SG],assignPublicIp=ENABLED}" \
+  --overrides '{"containerOverrides":[{"name":"judge","command":["python","run_evaluation.py"]}]}'
+```
+
 ## Snowflake roles and permissions
 
 Snowflake roles, user grants and least-privilege permissions are managed by a
@@ -221,6 +281,9 @@ terraform apply
 - DynamoDB: pennies/mo (PAY_PER_REQUEST, this app's volume is tiny)
 - ECR: pennies/mo (image storage, lifecycle policy caps at 10 images)
 - Secrets Manager: ~$0.40/mo per secret
+- Daily scheduled run: EventBridge Scheduler and SNS email are within
+  the free tier at one run/day; the one-off Fargate task adds about a
+  minute of 0.25 vCPU per day (well under $0.10/mo)
 - NAT gateway: $0 (deliberately avoided — see vpc.tf)
 - ACM certificate: $0 (public certs are free)
 - Route 53: pennies/mo (a few DNS queries; the hosted zone itself is

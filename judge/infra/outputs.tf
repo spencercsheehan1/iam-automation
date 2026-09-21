@@ -29,3 +29,12 @@ output "snowflake_private_key_secret_arn" {
   description = "Secrets Manager ARN to populate with the real private key (see infra/README.md)."
   value       = aws_secretsmanager_secret.snowflake_private_key.arn
 }
+
+output "daily_schedule_name" {
+  value = aws_scheduler_schedule.judge_daily.name
+}
+
+output "alerts_topic_arn" {
+  description = "SNS topic that emails alert_email when the daily run fails."
+  value       = aws_sns_topic.alerts.arn
+}
