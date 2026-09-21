@@ -51,6 +51,12 @@ data "aws_iam_policy_document" "ecs_task_permissions" {
     ]
     resources = [aws_dynamodb_table.evaluations.arn]
   }
+
+  statement {
+    sid       = "DashboardRunAlerts"
+    actions   = ["sns:Publish"]
+    resources = [aws_sns_topic.alerts.arn]
+  }
 }
 
 resource "aws_iam_role_policy" "ecs_task_permissions" {

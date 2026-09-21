@@ -15,6 +15,27 @@ import streamlit as st
 
 import storage
 from engine.evaluator import DECISION_ERROR, DECISION_FAIL, DECISION_PASS, PolicyError, evaluate_policies, load_policies
+from run_evaluation import EXIT_OK, exit_code_for
+
+ALERT_MEANINGS = {2: "at least one ERROR", 3: "at least one FAIL", 4: "zero users evaluated"}
+
+
+def _email_alert(results) -> None:
+    """Email the judge-alerts SNS topic when a manual run doesn't pass (same rule as the daily run)."""
+    topic_arn = os.environ.get("JUDGE_ALERTS_TOPIC_ARN")
+    code = exit_code_for(results)
+    if not topic_arn or code == EXIT_OK:
+        return
+    import boto3
+
+    lines = [f"{r.decision} {r.role} {r.user}: {r.reason}" for r in results if r.decision != DECISION_PASS]
+    boto3.client("sns", region_name=os.environ.get("AWS_REGION")).publish(
+        TopicArn=topic_arn,
+        Subject=f"Judge manual evaluation: {ALERT_MEANINGS[code]}",
+        Message=f"Manual dashboard run, exit code {code} ({ALERT_MEANINGS[code]}).\n\n"
+        + "\n".join(lines)
+        + "\n\nDashboard: https://judge.spencer-sheehan.com",
+    )
 
 st.set_page_config(page_title="Judge", page_icon="⚖️", layout="wide")
 
@@ -57,6 +78,10 @@ if run_clicked:
     with st.spinner("Judge is evaluating..."):
         results = evaluate_policies(policies)
         storage.save_results(results)
+    try:
+        _email_alert(results)
+    except Exception as exc:  # an email failure must not hide the results
+        st.warning(f"Evaluation saved, but the alert email could not be sent: {exc}")
     st.session_state.show_results = True
     st.success(f"Evaluation complete — {len(results)} user(s) evaluated.")
 
@@ -126,5 +151,5 @@ else:
 st.divider()
 st.caption(
     "Judge also runs automatically once a day (EventBridge Scheduler, 11:00 AM "
-    "Pacific) and emails an alert on any FAIL or ERROR; this button runs it on demand."
+    "Pacific). Both the daily run and this button email an alert on any FAIL or ERROR."
 )
