@@ -33,6 +33,78 @@ fixed cost this app doesn't need). A security group restricts inbound
 traffic to the task to only the ALB; the ALB itself accepts inbound
 HTTP (301-redirected to HTTPS) and HTTPS from the internet.
 
+## Data flow
+
+![Judge infra data flow](docs/judge-infra-data-flow.svg)
+
+The diagram covers both AWS accounts, the task's startup and runtime flows,
+the deploy path and the Snowflake Terraform root. It was exported from
+[Lucidchart](https://lucid.app/lucidchart/43a213fd-c93a-4a36-89e6-c42cd3b799c2/view)
+(link needs Lucid account access); the committed SVG is the copy to keep in
+sync when the infrastructure changes. Each arrow, by its label in the diagram:
+
+| Diagram label | Flow | What happens |
+|---------------|------|--------------|
+| DNS lookup | User → Route 53 | Resolves `judge.spencer-sheehan.com` (A alias → ALB; zone is in the `general` account) |
+| HTTPS 443 | User → ALB | ACM cert, TLS 1.3/1.2. Port 80 only 301-redirects to HTTPS |
+| HTTP 8501 | ALB → Fargate task | Plain HTTP to the task, including Streamlit's long-lived WebSocket |
+| Pull image | ECR → Fargate task | At task startup, the execution role pulls the `judge` image |
+| Snowflake Keys | Secrets Manager → Fargate task | At task startup, the execution role injects the Snowflake private key as `SNOWFLAKE_PRIVATE_KEY` |
+| SHOW GRANTS (JWT) | Fargate task → Snowflake | `SHOW GRANTS OF ROLE` over key-pair auth as `JUDGE_SERVICE` |
+| Read HR CSV | Fargate task → `employees.csv` | Reads the synthetic HR data baked into the image |
+| Audit rows | Fargate task → DynamoDB | Task role writes/reads audit-trail rows in `judge-evaluations` |
+| Monitor logs | Fargate task → CloudWatch Logs | Container stdout/stderr to `/ecs/judge` |
+| A alias, DNS validation, TLS cert | Route 53 → ALB / ACM → ALB | One-time DNS records and the certificate the ALB serves |
+
+Out-of-band flows: `deploy.sh` pushes the image to ECR and forces a new ECS
+deployment; `set_snowflake_key.sh` writes the real key into Secrets Manager;
+the `snowflake/` Terraform root manages Snowflake roles and grants.
+
+## File guide
+
+Everything in `judge/infra/` (the AWS root module; run Terraform from here).
+
+### Terraform resources
+
+| File | Purpose |
+|------|---------|
+| `versions.tf` | Terraform/provider version pins, the default `aws` provider (`harvey-admin` profile) and the `aws.dns` alias (`general` profile) for the Route 53 records. Also documents why state is local |
+| `variables.tf` | Input variables: region, app name, image tag, Fargate CPU/memory, Snowflake account/user/warehouse/role, domain name, Route 53 zone ID |
+| `vpc.tf` | Looks up the account's default VPC/subnets (no custom VPC, no NAT) and defines the two security groups: `judge-alb` (80/443 from the internet) and `judge-fargate-service` (8501 from the ALB only) |
+| `alb.tf` | Application Load Balancer, target group (port 8501, `/_stcore/health` check, 300s idle timeout for WebSockets), HTTP listener that redirects to HTTPS, and the HTTPS listener that forwards to the task |
+| `dns.tf` | ACM certificate (in the app account), its DNS validation records and the `judge.spencer-sheehan.com` A alias to the ALB (both records in the domain's account via `aws.dns`) |
+| `ecr.tf` | ECR repository for the Judge image (scan on push) and a lifecycle policy that keeps the 10 most recent images |
+| `ecs.tf` | ECS cluster, CloudWatch log group (14-day retention), Fargate task definition (env vars, injected secret, log config) and the service (1 task, public IP, attached to the ALB target group) |
+| `iam.tf` | Two roles: the **execution role** (pull image, write logs, read the Snowflake key secret at startup) and the **task role** (least-privilege DynamoDB access for the running container) |
+| `dynamodb.tf` | `judge-evaluations` audit-trail table (`pk`/`sk` keys, on-demand billing, point-in-time recovery) |
+| `secrets.tf` | Empty Secrets Manager secret for the Snowflake private key, with `ignore_changes` so Terraform never overwrites the real value |
+| `outputs.tf` | Values printed after `apply`: service URL, ALB DNS name, ECS cluster/service names, ECR URL, DynamoDB table name, secret ARN |
+
+### Scripts
+
+| File | Purpose |
+|------|---------|
+| `deploy.sh` | Builds the Docker image (linux/amd64), pushes it to ECR and, if the ECS service exists, forces a new deployment |
+| `set_snowflake_key.sh` | Writes the real Snowflake private key from `judge/.snowflake/rsa_key.p8` into Secrets Manager, bypassing Terraform state |
+
+### Configuration and Terraform bookkeeping
+
+| File | Purpose | In git? |
+|------|---------|---------|
+| `terraform.tfvars.example` | Template for `terraform.tfvars` (Snowflake account, user, warehouse, role; nothing secret) | Yes |
+| `terraform.tfvars` | Your actual variable values | No (gitignored) |
+| `.terraform.lock.hcl` | Pinned provider versions and checksums | Yes |
+| `.terraform/` | Downloaded providers, created by `terraform init` | No (gitignored) |
+| `terraform.tfstate`, `terraform.tfstate.backup` | Local Terraform state | No (gitignored) |
+
+### Subdirectory and docs
+
+| Path | Purpose |
+|------|---------|
+| `snowflake/` | Separate Terraform root (own state) for Snowflake roles, grants and permissions. See [`snowflake/README.md`](snowflake/README.md) |
+| `docs/judge-infra-data-flow.svg` | Data flow diagram embedded at the top of this README |
+| `README.md` | This file |
+
 ## Cross-account DNS
 
 `spencer-sheehan.com` is registered in a **different** AWS account
